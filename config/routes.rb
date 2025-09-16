@@ -8,7 +8,7 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       # Users routes
-      resources :users, only: [ :index, :show ] do
+      resources :users, only: [ :index, :show, :create ] do
         # Sleep records routes
         resources :sleep_records, only: [ :index, :show ] do
           collection do

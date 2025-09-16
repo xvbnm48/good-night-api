@@ -10,15 +10,17 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_16_154545) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_16_162004) do
   create_table "sleep_records", force: :cascade do |t|
     t.integer "user_id", null: false
     t.datetime "clock_in_time", null: false
     t.datetime "clock_out_time"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["clock_in_time", "clock_out_time"], name: "index_sleep_records_completed_by_time", where: "clock_out_time IS NOT NULL"
     t.index ["clock_in_time"], name: "index_sleep_records_on_clock_in_time"
     t.index ["clock_out_time"], name: "index_sleep_records_on_clock_out_time"
+    t.index ["user_id", "clock_out_time", "clock_in_time"], name: "index_sleep_records_on_user_and_times"
     t.index ["user_id", "created_at"], name: "index_sleep_records_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_sleep_records_on_user_id"
   end
@@ -28,6 +30,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_16_154545) do
     t.integer "followed_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["followed_id", "created_at"], name: "index_user_followings_on_followed_and_created"
     t.index ["followed_id"], name: "index_user_followings_on_followed_id"
     t.index ["follower_id", "followed_id"], name: "index_user_followings_on_follower_id_and_followed_id", unique: true
     t.index ["follower_id"], name: "index_user_followings_on_follower_id"
