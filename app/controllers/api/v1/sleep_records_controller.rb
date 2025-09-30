@@ -1,5 +1,6 @@
 class Api::V1::SleepRecordsController < Api::V1::BaseController
   before_action :set_user
+  before_action :set_sleep_record, only: [:show]
 
   # POST /api/v1/users/:user_id/sleep_records/clock_in
   # Clock In operation - creates a new sleep record or clocks out an in-progress one
@@ -30,7 +31,7 @@ class Api::V1::SleepRecordsController < Api::V1::BaseController
   # Return all clocked-in times, ordered by created time
   def index
     page = params[:page].to_i > 0 ? params[:page].to_i : 1
-    per_page = [ params[:per_page].to_i, 50 ].min.positive? ? [ params[:per_page].to_i, 50 ].min : 20
+    per_page = [ params[:per_page].to_i, 100 ].min.positive? ? [ params[:per_page].to_i, 100 ].min : 20
     offset = (page - 1) * per_page
 
     sleep_records = @user.sleep_records
@@ -54,32 +55,42 @@ class Api::V1::SleepRecordsController < Api::V1::BaseController
     })
   end
 
+  # GET /api/v1/users/:user_id/sleep_records/:id
+  def show
+    if @sleep_record
+      render json: {
+        success: true,
+        message: 'Sleep record retrieved successfully',
+        data: sleep_record_data(@sleep_record)
+      }
+    else
+      render json: {
+        success: false,
+        message: 'Sleep record not found'
+      }, status: :not_found
+    end
+  end
+
   # GET /api/v1/users/:user_id/sleep_records/following_sleep_records
   # See sleep records of all following users from previous week, sorted by duration
   def following_sleep_records
-    # Use caching for expensive queries
-    cache_key = "user_#{@user.id}_following_sleep_records_#{1.week.ago.to_date}"
+    following_users = @user.following
 
-    sleep_records_data = Rails.cache.fetch(cache_key, expires_in: 30.minutes) do
-      following_users = @user.following
+    sleep_records = SleepRecord
+                      .joins(:user)
+                      .where(user: following_users)
+                      .completed
+                      .for_week
+                      .includes(:user)
+                      .ordered_by_duration
+                      .limit(100) # Limit for performance
 
-      sleep_records = SleepRecord
-                        .joins(:user)
-                        .where(user: following_users)
-                        .completed
-                        .for_week
-                        .includes(:user)
-                        .ordered_by_duration
-                        .limit(100) # Limit for performance
-
-      sleep_records.map { |record| sleep_record_data(record) }
-    end
+    sleep_records_data = sleep_records.map { |record| sleep_record_data(record) }
 
     render_success({
       sleep_records: sleep_records_data,
       total_count: sleep_records_data.count,
-      week_start: 1.week.ago.beginning_of_day,
-      cached: true
+      week_start: 1.week.ago.beginning_of_day
     })
   end
 
@@ -87,6 +98,15 @@ class Api::V1::SleepRecordsController < Api::V1::BaseController
 
   def set_user
     @user = User.find(params[:user_id])
+  rescue ActiveRecord::RecordNotFound
+    render json: {
+      success: false,
+      message: 'User not found'
+    }, status: :not_found
+  end
+
+  def set_sleep_record
+    @sleep_record = @user&.sleep_records&.find_by(id: params[:id])
   end
 
   def sleep_record_data(record)
